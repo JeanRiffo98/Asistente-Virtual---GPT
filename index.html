@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Assistant</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        #chat-container {
+            font-family: Arial, sans-serif;
+        }
+        .message {
+            margin: 5px 0;
+        }
+        .user {
+            color: blue;
+        }
+        .assistant {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="messages"></div>
+        <input type="text" id="user-message" placeholder="Escribe un mensaje...">
+        <button onclick="sendMessage()">Enviar</button>
+    </div>
+
+    <script>
+        const socket = io('http://localhost:5000/chat');
+        let currentAssistantMessageElement = null;
+        let assistantMessageBuffer = "";
+
+        socket.on('connect', function() {
+            console.log('Connected to /chat namespace');
+        });
+
+        socket.on('response', function(data) {
+            console.log("Received response: ", data);
+            const messagesDiv = document.getElementById('messages');
+
+            // Verificar si es un mensaje de estado
+            if (data.text === 'Connected' && data.isFinal) {
+                console.log('Estado: Conectado');
+                return;
+            }
+
+            // Crear un nuevo elemento de mensaje del asistente si es el inicio de una nueva respuesta
+            if (data.isNewMessage) {
+                currentAssistantMessageElement = document.createElement('div');
+                currentAssistantMessageElement.classList.add('message', 'assistant');
+                currentAssistantMessageElement.innerHTML = "Assistant: "; // Añadir el prefijo
+                messagesDiv.appendChild(currentAssistantMessageElement);
+                assistantMessageBuffer = 'Assistant: '; // Reiniciar el buffer para el nuevo mensaje con el prefijo
+            }
+
+            // Agregar las partes del mensaje progresivamente
+            assistantMessageBuffer += data.text;
+            currentAssistantMessageElement.innerHTML = assistantMessageBuffer;
+
+            // Resetear el buffer y el elemento al final del mensaje
+            if (data.isFinal) {
+                assistantMessageBuffer = '';
+                currentAssistantMessageElement = null;
+            }
+        });
+
+        socket.on('disconnect', function() {
+            console.log('Disconnected from /chat namespace');
+        });
+
+        function sendMessage() {
+            const message = document.getElementById('user-message').value;
+            console.log("Sending message: ", message);
+            socket.emit('message', { message: message });
+            const messagesDiv = document.getElementById('messages');
+            const userMessageElement = document.createElement('div');
+            userMessageElement.classList.add('message', 'user');
+            userMessageElement.innerHTML = `User: ${message}`;
+            messagesDiv.appendChild(userMessageElement);
+            document.getElementById('user-message').value = '';
+        }
+    </script>
+</body>
+</html>
